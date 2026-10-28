@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UNCROWNED</title>
+  <style>
+    /* ---------------- THEMES ---------------- */
+    /* Dark Mode: Navy Blue background, Green, White, and Grey accents */
+    :root[data-theme="dark"] {
+      --bg: #0a192f;
+      --card-bg: #112240;
+      --card-inner: #1a2f55;
+      --border: #233554;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #22c55e;        /* Court Green */
+      --primary-hover: #16a34a;
+      --primary-text: #ffffff;
+      --accent: #64748b;         /* Grey */
+      --badge-bg: #1e3a5f;
+      --badge-text: #4ade80;
+      --btn-win: #22c55e;
+      --btn-win-text: #ffffff;
+      --danger: #ef4444;
+      --tab-bg: #0f1e36;
+      --tab-active: #112240;
+      --tab-text: #cbd5e1;
+      --tab-active-text: #22c55e;
+      --input-bg: #0a192f;
+    }
+
+    /* Light Mode: Off-white background, Blue, Dandelion Yellow accents, White fonts on badges/buttons */
+    :root[data-theme="light"] {
+      --bg: #f8fafc;             /* Off-white */
+      --card-bg: #ffffff;
+      --card-inner: #f1f5f9;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #1d4ed8;        /* Court Blue */
+      --primary-hover: #1e40af;
+      --primary-text: #ffffff;   /* White font */
+      --accent: #f59e0b;         /* Dandelion */
+      --badge-bg: #f59e0b;
+      --badge-text: #ffffff;     /* White font */
+      --btn-win: #1d4ed8;        /* Blue */
+      --btn-win-text: #ffffff;
+      --danger: #dc2626;
+      --tab-bg: #e2e8f0;
+      --tab-active: #ffffff;
+      --tab-text: #475569;
+      --tab-active-text: #1d4ed8;
+      --input-bg: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--text);
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+    .container { max-width: 860px; margin: 0 auto; }
+    
+    /* Top Bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    h1 { font-size: 1.35rem; margin: 0; letter-spacing: 1px; font-weight: 800; }
+
+    .theme-toggle-btn {
+      background: var(--card-inner);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    /* Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--tab-bg);
+      padding: 4px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+    }
+    .nav-btn {
+      flex: 1;
+      padding: 10px 4px;
+      border: none;
+      background: transparent;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--tab-text);
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .nav-btn.active {
+      background: var(--tab-active);
+      color: var(--tab-active-text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0 0 12px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 0.75rem;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-weight: 700;
+    }
+
+    /* Court Display */
+    .court { display: flex; gap: 12px; }
+    .team-box {
+      flex: 1;
+      padding: 14px;
+      border-radius: 8px;
+      text-align: center;
+      background: var(--card-inner);
+      border: 2px solid var(--border);
+    }
+    .team-name { font-size: 1.25rem; font-weight: bold; margin-bottom: 4px; word-break: break-word; }
+    .streak-badge { font-size: 0.85rem; color: var(--accent); font-weight: 700; margin-bottom: 10px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--primary-text);
+      transition: opacity 0.2s;
+    }
+    .btn:active { opacity: 0.85; }
+    .btn-win { background: var(--btn-win); color: var(--btn-win-text); margin-bottom: 6px; }
+    .btn-add { background: var(--primary); color: var(--primary-text); width: auto; }
+    .btn-share { background: var(--accent); color: #ffffff; font-size: 0.85rem; padding: 8px 12px; width: auto; font-weight: 700; }
+    .btn-danger { background: var(--danger); color: #ffffff; font-size: 0.85rem; padding: 6px 10px; width: auto; }
+    .btn-warning { background: var(--accent); color: #ffffff; font-size: 0.85rem; padding: 8px 12px; width: auto; }
+    .btn-remove-court { background: transparent; color: var(--danger); border: 1px solid var(--danger); font-size: 0.75rem; padding: 5px; margin-top: 4px; }
+    .btn-delete-match { background: transparent; color: var(--danger); border: 1px solid var(--border); font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+
+    .input-row { display: flex; gap: 8px; }
+    .input-row input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 1rem;
+      background: var(--input-bg);
+      color: var(--text);
+    }
+
+    /* Queue */
+    .queue-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .queue-item:last-child { border-bottom: none; }
+    .next-tag { background: var(--badge-bg); color: var(--badge-text); padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; margin-left: 6px; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-weight: 600; }
+
+    /* Lists */
+    .history-log { max-height: 380px; overflow-y: auto; padding: 0; margin: 0; list-style: none; font-size: 0.85rem; }
+    .history-item { padding: 8px 4px; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .history-meta { color: var(--text-muted); font-size: 0.75rem; display: block; margin-bottom: 2px; }
+
+    /* History Filter Bar */
+    .history-filters {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .filter-chip {
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--card-inner);
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .filter-chip.active {
+      background: var(--primary);
+      color: var(--primary-text);
+      border-color: var(--primary);
+    }
+
+    .date-header {
+      background: var(--card-inner);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--text);
+      margin: 10px 0 6px 0;
+      display: flex;
+      justify-content: space-between;
+      border-left: 3px solid var(--primary);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <h1>UNCROWNED</h1>
+    <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()">
+      <span>Light Mode</span>
+    </button>
+  </div>
+
+  <!-- Tabs Navigation: Clean 4-Tab Separation -->
+  <div class="nav-tabs">
+    <button class="nav-btn active" onclick="switchPage('main', this)">Court</button>
+    <button class="nav-btn" onclick="switchPage('today', this)">Today's Stats</button>
+    <button class="nav-btn" onclick="switchPage('history', this)">Game History</button>
+    <button class="nav-btn" onclick="switchPage('alltime', this)">All-Time</button>
+  </div>
+
+  <!-- ==================== PAGE 1: COURT (CLEAN QUEUE & PLAY AREA ONLY) ==================== -->
+  <div id="page-main" class="page active">
+    
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+      <button class="btn btn-share" onclick="shareTodaySummary()">Share Summary (GC)</button>
+      <button class="btn btn-warning" onclick="startNewDaySession()">Start New Day (Reset Queue)</button>
+    </div>
+
+    <!-- Active Court -->
+    <div class="card">
+      <div class="card-title">
+        <span>Currently on Court</span>
+        <span class="badge">Cap: 3-Win Streak</span>
+      </div>
+      <div id="matchArea" class="court">
+        <div style="flex:1; text-align:center; padding: 18px; color:var(--text-muted);">
+          Register at least 2 teams below to begin games.
+        </div>
+      </div>
+    </div>
+
+    <!-- Waiting Queue -->
+    <div class="card">
+      <div class="card-title">
+        <span>Waiting Queue</span>
+        <span id="queueCount" style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted);">0 Waiting</span>
+      </div>
+      <div id="queueList">
+        <p style="color: var(--text-muted); margin: 0;">No teams waiting in queue.</p>
+      </div>
+    </div>
+
+    <!-- Registration -->
+    <div class="card">
+      <div class="card-title">Register Team</div>
+      <div class="input-row">
+        <input type="text" id="teamInput" placeholder="Team name (e.g. Thunder)" onkeydown="if(event.key==='Enter') registerTeam()" />
+        <button class="btn btn-add" onclick="registerTeam()">Add Team</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== PAGE 2: TODAY'S STATS (DEDICATED PAGE) ==================== -->
+  <div id="page-today" class="page">
+    
+    <!-- Today's Leaderboard -->
+    <div class="card">
+      <div class="card-title">Today's Leaderboard</div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Team</th>
+            <th>W</th>
+            <th>L</th>
+            <th>Streak</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="todayStandingsTable">
+          <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No matches recorded today yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Today's Match Log -->
+    <div class="card">
+      <div class="card-title">
+        <span>Today's Matches</span>
+        <span id="todayMatchCount" class="badge">0 Matches</span>
+      </div>
+      <ul id="todayHistoryList" class="history-log">
+        <li style="color: var(--text-muted);">No matches played today yet.</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- ==================== PAGE 3: GAME HISTORY ==================== -->
+  <div id="page-history" class="page">
+    <div class="card">
+      <div class="card-title">
+        <span>Past Games & Historical Matches</span>
+        <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.78rem;" onclick="clearAllHistory()">Clear History</button>
+      </div>
+      
+      <!-- History Filters: Today, Yesterday, Week, Month -->
+      <div class="history-filters">
+        <button class="filter-chip active" onclick="setHistoryFilter('today', this)">Today</button>
+        <button class="filter-chip" onclick="setHistoryFilter('yesterday', this)">Yesterday</button>
+        <button class="filter-chip" onclick="setHistoryFilter('week', this)">This Week</button>
+        <button class="filter-chip" onclick="setHistoryFilter('month', this)">This Month</button>
+      </div>
+
+      <div id="pastGamesContainer" style="max-height: 500px; overflow-y: auto;">
+        <ul id="pastGamesList" class="history-log" style="max-height: none;">
+          <li style="color: var(--text-muted);">No game records found.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PAGE 4: ALL-TIME LEADERBOARD ==================== -->
+  <div id="page-alltime" class="page">
+    <div class="card">
+      <div class="card-title">All-Time Cumulative Leaderboard</div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 10px 0;">Career records across all sessions.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Team</th>
+            <th>Wins</th>
+            <th>Losses</th>
+            <th>Win Rate</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="allTimeStandingsTable">
+          <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No career records recorded yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const STREAK_LIMIT = 3;
+  let activeHistoryFilter = 'today';
+
+  let allTimeTeams = JSON.parse(localStorage.getItem('court_alltime_teams') || '{}');
+  let todayStats = JSON.parse(localStorage.getItem('court_today_stats') || '{}');
+  let activeMatch = JSON.parse(localStorage.getItem('court_active') || '[]');
+  let queue = JSON.parse(localStorage.getItem('court_queue') || '[]');
+  let allMatchLogs = JSON.parse(localStorage.getItem('court_all_logs') || '[]'); 
+
+  function initTheme() {
+    const savedTheme = localStorage.getItem('court_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeButton(savedTheme);
+  }
+
+  function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('court_theme', newTheme);
+    updateThemeButton(newTheme);
+  }
+
+  function updateThemeButton(theme) {
+    const btn = document.getElementById("themeToggleBtn");
+    btn.innerHTML = theme === 'dark' ? `<span>Light Mode</span>` : `<span>Dark Mode</span>`;
+  }
+
+  function saveAll() {
+    localStorage.setItem('court_alltime_teams', JSON.stringify(allTimeTeams));
+    localStorage.setItem('court_today_stats', JSON.stringify(todayStats));
+    localStorage.setItem('court_active', JSON.stringify(activeMatch));
+    localStorage.setItem('court_queue', JSON.stringify(queue));
+    localStorage.setItem('court_all_logs', JSON.stringify(allMatchLogs));
+  }
+
+  function getTodayString() {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  function getYesterdayString() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  }
+
+  function switchPage(pageKey, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    
+    document.getElementById(`page-${pageKey}`).classList.add('active');
+    btn.classList.add('active');
+
+    if (pageKey === 'today') renderTodayStats();
+    if (pageKey === 'history') renderPastGames();
+    if (pageKey === 'alltime') renderAllTimeLeaderboard();
+  }
+
+  function registerTeam() {
+    const input = document.getElementById("teamInput");
+    const name = input.value.trim();
+    if (!name) return;
+
+    if (activeMatch.includes(name) || queue.includes(name)) {
+      alert("This team is already on court or in the queue!");
+      return;
+    }
+
+    if (!allTimeTeams[name]) allTimeTeams[name] = { wins: 0, losses: 0 };
+    if (!todayStats[name]) todayStats[name] = { wins: 0, losses: 0, streak: 0 };
+
+    input.value = "";
+
+    if (activeMatch.length < 2) {
+      activeMatch.push(name);
+    } else {
+      queue.push(name);
+    }
+
+    saveAll();
+    renderMainPage();
+  }
+
+  function recordResult(winnerIndex) {
+    const loserIndex = winnerIndex === 0 ? 1 : 0;
+    const winner = activeMatch[winnerIndex];
+    const loser = activeMatch[loserIndex];
+
+    if (!todayStats[winner]) todayStats[winner] = { wins: 0, losses: 0, streak: 0 };
+    if (!todayStats[loser]) todayStats[loser] = { wins: 0, losses: 0, streak: 0 };
+    if (!allTimeTeams[winner]) allTimeTeams[winner] = { wins: 0, losses: 0 };
+    if (!allTimeTeams[loser]) allTimeTeams[loser] = { wins: 0, losses: 0 };
+
+    todayStats[winner].wins += 1;
+    todayStats[winner].streak += 1;
+    todayStats[loser].losses += 1;
+    todayStats[loser].streak = 0;
+
+    allTimeTeams[winner].wins += 1;
+    allTimeTeams[loser].losses += 1;
+
+    const now = new Date();
+    const dateStr = getTodayString();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let note = "Winner stays";
+    if (todayStats[winner].streak >= STREAK_LIMIT) {
+      note = `3-win streak reached (${winner} rests)`;
+      todayStats[winner].streak = 0;
+      queue.push(loser);
+      queue.push(winner);
+
+      activeMatch = [];
+      if (queue.length > 0) activeMatch.push(queue.shift());
+      if (queue.length > 0) activeMatch.push(queue.shift());
+    } else {
+      queue.push(loser);
+      if (queue.length > 0) {
+        activeMatch[loserIndex] = queue.shift();
+      }
+    }
+
+    allMatchLogs.unshift({
+      id: Date.now(),
+      winner,
+      loser,
+      date: dateStr,
+      time: timeStr,
+      note
+    });
+
+    saveAll();
+    renderMainPage();
+    renderTodayStats();
+  }
+
+  function removeMatch(matchId) {
+    const idx = allMatchLogs.findIndex(m => m.id === matchId);
+    if (idx === -1) return;
+
+    const match = allMatchLogs[idx];
+    if (!confirm(`Delete match record: "${match.winner} def. ${match.loser}"? This will reverse their stats.`)) return;
+
+    if (match.date === getTodayString()) {
+      if (todayStats[match.winner] && todayStats[match.winner].wins > 0) {
+        todayStats[match.winner].wins -= 1;
+      }
+      if (todayStats[match.loser] && todayStats[match.loser].losses > 0) {
+        todayStats[match.loser].losses -= 1;
+      }
+    }
+
+    if (allTimeTeams[match.winner] && allTimeTeams[match.winner].wins > 0) {
+      allTimeTeams[match.winner].wins -= 1;
+    }
+    if (allTimeTeams[match.loser] && allTimeTeams[match.loser].losses > 0) {
+      allTimeTeams[match.loser].losses -= 1;
+    }
+
+    allMatchLogs.splice(idx, 1);
+    saveAll();
+    renderMainPage();
+    renderTodayStats();
+    renderPastGames();
+    renderAllTimeLeaderboard();
+  }
+
+  function clearAllHistory() {
+    if (!confirm("Are you sure you want to clear ALL past match records? (Active teams and standings will remain, but match history will be emptied.)")) return;
+    allMatchLogs = [];
+    saveAll();
+    renderTodayStats();
+    renderPastGames();
+  }
+
+  function deleteTeam(teamName) {
+    if (!confirm(`Remove "${teamName}" from today's session?`)) return;
+
+    delete todayStats[teamName];
+    queue = queue.filter(t => t !== teamName);
+
+    if (activeMatch.includes(teamName)) {
+      activeMatch = activeMatch.filter(t => t !== teamName);
+      if (queue.length > 0 && activeMatch.length < 2) {
+        activeMatch.push(queue.shift());
+      }
+    }
+
+    saveAll();
+    renderMainPage();
+    renderTodayStats();
+  }
+
+  function deleteAllTimeTeam(teamName) {
+    if (!confirm(`Permanently remove "${teamName}" from the All-Time Leaderboard? This also removes them from today's rotation.`)) return;
+
+    delete allTimeTeams[teamName];
+    delete todayStats[teamName];
+    queue = queue.filter(t => t !== teamName);
+
+    if (activeMatch.includes(teamName)) {
+      activeMatch = activeMatch.filter(t => t !== teamName);
+      if (queue.length > 0 && activeMatch.length < 2) {
+        activeMatch.push(queue.shift());
+      }
+    }
+
+    saveAll();
+    renderAllTimeLeaderboard();
+    renderMainPage();
+    renderTodayStats();
+  }
+
+  function startNewDaySession() {
+    if (!confirm("Start a new day? This will clear the active court and queue, and reset today's leaderboard. Past game history and all-time records remain intact.")) return;
+    
+    activeMatch = [];
+    queue = [];
+    todayStats = {};
+    saveAll();
+    renderMainPage();
+    renderTodayStats();
+  }
+
+  function shareTodaySummary() {
+    const todayStr = getTodayString();
+    const todayLogs = allMatchLogs.filter(log => log.date === todayStr);
+    const activeTeams = Object.keys(todayStats).sort((a, b) => todayStats[b].wins - todayStats[a].wins);
+
+    if (activeTeams.length === 0 && todayLogs.length === 0) {
+      alert("No matches or teams recorded today to share.");
+      return;
+    }
+
+    let summary = `UNCROWNED — SUMMARY\nDate: ${todayStr}\n\n`;
+    
+    summary += `TODAY'S STANDINGS:\n`;
+    activeTeams.forEach((name, i) => {
+      const t = todayStats[name];
+      summary += `${i + 1}. ${name} - ${t.wins}W - ${t.losses}L (Streak: ${t.streak})\n`;
+    });
+
+    summary += `\nTODAY'S MATCHES (${todayLogs.length}):\n`;
+    todayLogs.slice(0, 15).forEach(m => {
+      summary += `- [${m.time}] ${m.winner} def. ${m.loser}\n`;
+    });
+    if (todayLogs.length > 15) {
+      summary += `...and ${todayLogs.length - 15} more matches.\n`;
+    }
+
+    if (navigator.share) {
+      navigator.share({ title: `UNCROWNED Summary (${todayStr})`, text: summary }).catch(() => copyToClipboard(summary));
+    } else {
+      copyToClipboard(summary);
+    }
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Summary copied to clipboard!");
+    }).catch(() => {
+      prompt("Copy summary text:", text);
+    });
+  }
+
+  // Render Page 1 (Court only)
+  function renderMainPage() {
+    const matchArea = document.getElementById("matchArea");
+    if (activeMatch.length === 0) {
+      matchArea.innerHTML = `<div style="flex:1; text-align:center; padding:18px; color:var(--text-muted);">Add teams below to start playing.</div>`;
+    } else if (activeMatch.length === 1) {
+      matchArea.innerHTML = `
+        <div class="team-box">
+          <div class="team-name">${activeMatch[0]}</div>
+          <div class="streak-badge">Streak: ${todayStats[activeMatch[0]]?.streak || 0} / ${STREAK_LIMIT}</div>
+          <p style="color:var(--text-muted); font-size:0.85rem; margin:6px 0;">Waiting for next challenger...</p>
+          <button class="btn btn-remove-court" onclick="deleteTeam('${activeMatch[0]}')">Remove</button>
+        </div>
+      `;
+    } else {
+      matchArea.innerHTML = activeMatch.map((team, idx) => `
+        <div class="team-box">
+          <div class="team-name">${team}</div>
+          <div class="streak-badge">Streak: ${todayStats[team]?.streak || 0} / ${STREAK_LIMIT}</div>
+          <button class="btn btn-win" onclick="recordResult(${idx})">Declare Winner</button>
+          <button class="btn btn-remove-court" onclick="deleteTeam('${team}')">Leave / Remove</button>
+        </div>
+      `).join("");
+    }
+
+    const queueList = document.getElementById("queueList");
+    document.getElementById("queueCount").innerText = `${queue.length} Waiting`;
+    if (queue.length === 0) {
+      queueList.innerHTML = `<p style="color: var(--text-muted); margin: 0;">No teams waiting in queue.</p>`;
+    } else {
+      queueList.innerHTML = queue.map((team, idx) => `
+        <div class="queue-item">
+          <div>
+            <strong>${idx + 1}.</strong> ${team}
+            ${idx === 0 ? '<span class="next-tag">NEXT UP</span>' : ''}
+          </div>
+          <button class="btn btn-danger" onclick="deleteTeam('${team}')">Remove</button>
+        </div>
+      `).join("");
+    }
+  }
+
+  // Render Page 2 (Today's Stats)
+  function renderTodayStats() {
+    const todayStr = getTodayString();
+    const todayLogs = allMatchLogs.filter(log => log.date === todayStr);
+    const todayList = document.getElementById("todayHistoryList");
+    document.getElementById("todayMatchCount").innerText = `${todayLogs.length} Matches`;
+
+    if (todayLogs.length === 0) {
+      todayList.innerHTML = `<li style="color: var(--text-muted); padding: 4px 0;">No matches played today yet.</li>`;
+    } else {
+      todayList.innerHTML = todayLogs.map(item => `
+        <li class="history-item">
+          <div>
+            <span class="history-meta">Time: ${item.time}</span>
+            <b>${item.winner}</b> defeated <b>${item.loser}</b>
+            <span style="color:var(--text-muted); font-size:0.75rem;">- ${item.note}</span>
+          </div>
+          <button class="btn-delete-match" onclick="removeMatch(${item.id})">Delete</button>
+        </li>
+      `).join("");
+    }
+
+    const todayTable = document.getElementById("todayStandingsTable");
+    const activeTeamsToday = Object.keys(todayStats).sort((a, b) => todayStats[b].wins - todayStats[a].wins);
+
+    if (activeTeamsToday.length === 0) {
+      todayTable.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No teams registered today yet.</td></tr>`;
+    } else {
+      todayTable.innerHTML = activeTeamsToday.map((name, idx) => `
+        <tr>
+          <td><strong>#${idx + 1}</strong></td>
+          <td><strong>${name}</strong></td>
+          <td>${todayStats[name].wins}</td>
+          <td>${todayStats[name].losses}</td>
+          <td>${todayStats[name].streak}</td>
+          <td><button class="btn btn-danger" style="padding: 2px 6px; font-size: 0.75rem;" onclick="deleteTeam('${name}')">Remove</button></td>
+        </tr>
+      `).join("");
+    }
+  }
+
+  // Render Page 3 (Game History)
+  function setHistoryFilter(filter, btn) {
+    activeHistoryFilter = filter;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    renderPastGames();
+  }
+
+  function renderPastGames() {
+    const container = document.getElementById("pastGamesContainer");
+    const todayStr = getTodayString();
+    const yesterdayStr = getYesterdayString();
+
+    const now = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+
+    let filtered = [];
+
+    if (activeHistoryFilter === 'today') {
+      filtered = allMatchLogs.filter(m => m.date === todayStr);
+    } else if (activeHistoryFilter === 'yesterday') {
+      filtered = allMatchLogs.filter(m => m.date === yesterdayStr);
+    } else if (activeHistoryFilter === 'week') {
+      filtered = allMatchLogs.filter(m => new Date(m.date) >= sevenDaysAgo);
+    } else if (activeHistoryFilter === 'month') {
+      filtered = allMatchLogs.filter(m => new Date(m.date) >= thirtyDaysAgo);
+    }
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<ul class="history-log"><li style="color: var(--text-muted); padding: 12px 0;">No games played for the selected period (${activeHistoryFilter}).</li></ul>`;
+      return;
+    }
+
+    if (activeHistoryFilter === 'week' || activeHistoryFilter === 'month') {
+      const grouped = {};
+      filtered.forEach(log => {
+        if (!grouped[log.date]) grouped[log.date] = [];
+        grouped[log.date].push(log);
+      });
+
+      const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+
+      let html = "";
+      sortedDates.forEach(date => {
+        const matches = grouped[date];
+        html += `
+          <div class="date-header">
+            <span>Date: ${date}</span>
+            <span>${matches.length} ${matches.length === 1 ? 'Game' : 'Games'} Played</span>
+          </div>
+          <ul class="history-log" style="margin-bottom: 12px;">
+            ${matches.map(m => `
+              <li class="history-item">
+                <div>
+                  <span class="history-meta">Time: ${m.time}</span>
+                  <b>${m.winner}</b> defeated <b>${m.loser}</b>
+                  <span style="color:var(--text-muted); font-size:0.75rem;">(${m.note})</span>
+                </div>
+                <button class="btn-delete-match" onclick="removeMatch(${m.id})">Delete</button>
+              </li>
+            `).join("")}
+          </ul>
+        `;
+      });
+      container.innerHTML = html;
+    } else {
+      container.innerHTML = `
+        <ul class="history-log">
+          ${filtered.map(m => `
+            <li class="history-item">
+              <div>
+                <span class="history-meta">Date: ${m.date} | Time: ${m.time}</span>
+                <b>${m.winner}</b> defeated <b>${m.loser}</b>
+                <span style="color:var(--text-muted); font-size:0.75rem;">(${m.note})</span>
+              </div>
+              <button class="btn-delete-match" onclick="removeMatch(${m.id})">Delete</button>
+            </li>
+          `).join("")}
+        </ul>
+      `;
+    }
+  }
+
+  // Render Page 4 (All-Time Leaderboard)
+  function renderAllTimeLeaderboard() {
+    const table = document.getElementById("allTimeStandingsTable");
+    const teamNames = Object.keys(allTimeTeams);
+
+    teamNames.sort((a, b) => {
+      if (allTimeTeams[b].wins !== allTimeTeams[a].wins) {
+        return allTimeTeams[b].wins - allTimeTeams[a].wins;
+      }
+      const totalA = allTimeTeams[a].wins + allTimeTeams[a].losses;
+      const totalB = allTimeTeams[b].wins + allTimeTeams[b].losses;
+      const pctA = totalA > 0 ? allTimeTeams[a].wins / totalA : 0;
+      const pctB = totalB > 0 ? allTimeTeams[b].wins / totalB : 0;
+      return pctB - pctA;
+    });
+
+    if (teamNames.length === 0) {
+      table.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No career records recorded yet.</td></tr>`;
+    } else {
+      table.innerHTML = teamNames.map((name, idx) => {
+        const t = allTimeTeams[name];
+        const total = t.wins + t.losses;
+        const pct = total > 0 ? Math.round((t.wins / total) * 100) : 0;
+        return `
+          <tr>
+            <td><strong>#${idx + 1}</strong></td>
+            <td><strong>${name}</strong></td>
+            <td>${t.wins}</td>
+            <td>${t.losses}</td>
+            <td>${pct}%</td>
+            <td><button class="btn btn-danger" style="padding: 2px 6px; font-size: 0.75rem;" onclick="deleteAllTimeTeam('${name}')">Remove</button></td>
+          </tr>
+        `;
+      }).join("");
+    }
+  }
+
+  initTheme();
+  renderMainPage();
+</script>
+
+</body>
+</html>
