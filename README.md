@@ -16,6 +16,13 @@ A winner-stays queue manager for pickup basketball. Teams register, two play, th
 
 Every rule is covered by unit tests in `src/engine/queue.test.js`.
 
+## Using it on a phone
+
+- Tabs sit at the bottom of the screen, within thumb reach. The red **+** button opens "Add a team"; it stays open so you can add several teams in a row.
+- Swipe a queue team left to remove it (or tap ×). Removing a team, starting a new day, clearing history or deleting a record all show an **Undo** toast.
+- On a laptop or tablet in landscape (900px and wider) the court and queue sit on the left and today's stats on the right.
+- Keyboard: arrow keys, Home and End move between tabs. Screen readers hear who is on court after every change.
+
 ## Undo and export
 
 - **Undo:** after each game a toast offers Undo for 8 seconds, and the court shows "Last game … Undo" until something else changes. Undo puts the court, queue, streaks and stats back exactly as they were. You can undo several games in a row (up to the last 10). Removing a team, deleting a match or starting a new day ends the undo chain.
@@ -44,7 +51,9 @@ src/
   App.jsx               app state, tab navigation, action handlers
   engine/queue.js       court rules as pure functions (no DOM, no storage)
   engine/queue.test.js  unit tests for every rule
-  components/           one component per page, MatchItem, Feedback (modal + toasts)
+  components/           one component per page, TabBar, QueueItem (swipe), AddTeamForm/Sheet,
+                        MatchItem, Icons, Feedback (modal + toasts)
+  hooks/useMediaQuery.js  switches between the phone and wide layouts
   utils/dates.js        Manila-time date helpers
   utils/storage.js      localStorage load/save that never crashes on bad data
   utils/export.js       CSV/JSON export (formula-safe CSV)

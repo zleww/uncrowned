@@ -3,47 +3,18 @@ import * as engine from './engine/queue.js';
 import { getTodayString } from './utils/dates.js';
 import { loadState, saveState, saveTheme } from './utils/storage.js';
 import { downloadFile, matchesToCSV, stateToJSON } from './utils/export.js';
+import { useMediaQuery } from './hooks/useMediaQuery.js';
 import { useFeedback } from './components/Feedback.jsx';
+import { MoonIcon, PlusIcon, ShareIcon, SunIcon } from './components/Icons.jsx';
+import TabBar, { TABS } from './components/TabBar.jsx';
 import CourtPage from './components/CourtPage.jsx';
 import TodayPage from './components/TodayPage.jsx';
 import HistoryPage from './components/HistoryPage.jsx';
 import AllTimePage from './components/AllTimePage.jsx';
+import AddTeamSheet from './components/AddTeamSheet.jsx';
 
-const TABS = [
-  { key: 'main', label: 'Court' },
-  { key: 'today', label: 'Today' },
-  { key: 'history', label: 'History' },
-  { key: 'alltime', label: 'All-Time' },
-];
-
-const iconProps = {
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 2,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  'aria-hidden': true,
-};
-
-const ShareIcon = () => (
-  <svg {...iconProps}>
-    <path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
-  </svg>
-);
-
-const SunIcon = () => (
-  <svg {...iconProps}>
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-  </svg>
-);
-
-const MoonIcon = () => (
-  <svg {...iconProps}>
-    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-  </svg>
-);
+// At this width the court and today's stats fit side by side.
+const WIDE_QUERY = '(min-width: 900px)';
 
 const ordinal = (n) => {
   const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th';
@@ -66,15 +37,45 @@ export default function App() {
   const [page, setPage] = useState('main');
   const [theme, setTheme] = useState(() => document.documentElement.getAttribute('data-theme'));
   const today = useToday();
+  const wide = useMediaQuery(WIDE_QUERY);
   const { confirm, notify, showText } = useFeedback();
-  // The latest state, for callbacks that outlive a render (the toast's Undo
-  // button is created with the state of the moment the game was recorded).
+  // The latest state, for callbacks that outlive a render (a toast's Undo
+  // button is created with the state of the moment it was shown).
   const stateRef = useRef(state);
+  const addSheetRef = useRef(null);
 
   useEffect(() => {
     stateRef.current = state;
     saveState(state);
   }, [state]);
+
+  // Sets the state right away, so a second tap before React re-renders
+  // already sees the new state.
+  function commit(next) {
+    stateRef.current = next;
+    setState(next);
+  }
+
+  // Runs an action and shows a toast with Undo. Undo puts back the whole
+  // state from before, but only if nothing else has changed since.
+  function commitWithUndo(next, message, undoneMessage) {
+    const before = stateRef.current;
+    commit(next);
+    notify(message, {
+      key: 'result',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          if (stateRef.current !== next) {
+            notify("That can't be undone anymore.", { key: 'result' });
+            return;
+          }
+          commit(before);
+          notify(undoneMessage, { key: 'result' });
+        },
+      },
+    });
+  }
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -84,23 +85,22 @@ export default function App() {
   }
 
   function handleRegister(name) {
-    const result = engine.registerTeam(state, name);
-    if (result.status === 'ok') {
-      setState(result.state);
-      notify(
-        result.state.activeMatch.includes(result.name)
-          ? `${result.name} is on court`
-          : `${result.name} joined the queue (#${result.state.queue.length})`,
-      );
-    }
-    return result.status;
+    const result = engine.registerTeam(stateRef.current, name);
+    if (result.status !== 'ok') return { status: result.status };
+    commit(result.state);
+    const message = result.state.activeMatch.includes(result.name)
+      ? `${result.name} is on court`
+      : `${result.name} joined the queue (#${result.state.queue.length})`;
+    notify(message);
+    return { status: 'ok', message };
   }
 
   function handleWin(idx) {
-    const winner = state.activeMatch[idx];
-    const loser = state.activeMatch[idx === 0 ? 1 : 0];
-    const next = engine.recordResult(state, idx);
-    setState(next);
+    const current = stateRef.current;
+    const winner = current.activeMatch[idx];
+    const loser = current.activeMatch[idx === 0 ? 1 : 0];
+    const next = engine.recordResult(current, idx);
+    commit(next);
     const streak = next.todayStats[winner].streak;
     const matchId = next.allMatchLogs[0].id;
     notify(
@@ -121,37 +121,28 @@ export default function App() {
       notify("That game can't be undone anymore.", { key: 'result' });
       return;
     }
-    stateRef.current = next; // a quick second tap sees the undone state
-    setState(next);
+    commit(next);
     notify(`Undone: ${match.winner} def. ${match.loser}`, { key: 'result' });
   }
 
-  async function handleRemoveTeam(name) {
-    const ok = await confirm({
-      title: `Remove ${name}?`,
-      message: "They leave the court or queue and today's stats. All-time records stay.",
-      confirmLabel: 'Remove',
-      danger: true,
-    });
-    if (!ok) return;
-    setState((s) => engine.removeTeam(s, name));
-    notify(`${name} removed`);
+  // No confirm box: removing is quick to undo from the toast.
+  function handleRemoveTeam(name) {
+    commitWithUndo(engine.removeTeam(stateRef.current, name), `${name} removed`, `${name} is back`);
   }
 
   async function handleRemoveAllTimeTeam(name) {
     const ok = await confirm({
       title: `Delete ${name}'s record?`,
-      message: "This permanently removes their all-time record and takes them out of today's rotation.",
+      message: "This removes their all-time record and takes them out of today's rotation.",
       confirmLabel: 'Delete record',
       danger: true,
     });
     if (!ok) return;
-    setState((s) => engine.removeTeamEverywhere(s, name));
-    notify(`${name}'s record deleted`);
+    commitWithUndo(engine.removeTeamEverywhere(stateRef.current, name), `${name}'s record deleted`, `${name}'s record is back`);
   }
 
   async function handleDeleteMatch(id) {
-    const match = state.allMatchLogs.find((m) => m.id === id);
+    const match = stateRef.current.allMatchLogs.find((m) => m.id === id);
     if (!match) return;
     const ok = await confirm({
       title: 'Delete this match?',
@@ -160,20 +151,18 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
-    setState((s) => engine.removeMatch(s, id, getTodayString()));
-    notify('Match deleted');
+    commitWithUndo(engine.removeMatch(stateRef.current, id, getTodayString()), 'Match deleted', 'Match is back');
   }
 
   async function handleClearHistory() {
     const ok = await confirm({
       title: 'Clear all match history?',
-      message: 'Every past match is deleted. Teams on court, the queue and all-time records stay.',
+      message: 'Every past match is deleted. Teams on court, the queue and all-time records stay. Export a backup first if you want to keep it.',
       confirmLabel: 'Clear history',
       danger: true,
     });
     if (!ok) return;
-    setState((s) => engine.clearHistory(s));
-    notify('Match history cleared');
+    commitWithUndo(engine.clearHistory(stateRef.current), 'Match history cleared', 'Match history is back');
   }
 
   async function handleNewDay() {
@@ -184,8 +173,7 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
-    setState((s) => engine.startNewDay(s));
-    notify('New day started');
+    commitWithUndo(engine.startNewDay(stateRef.current), 'New day started', 'Back to the previous session');
   }
 
   function handleExport(format) {
@@ -222,6 +210,10 @@ export default function App() {
   }
 
   const undoable = engine.getUndoableMatch(state);
+  // On wide screens "Today" sits beside the court, so it isn't a tab.
+  const tabs = wide ? TABS.filter((t) => t.key !== 'today') : TABS;
+  const view = wide && page === 'today' ? 'main' : page;
+  const split = wide && view === 'main';
 
   return (
     <div className="container">
@@ -243,37 +235,26 @@ export default function App() {
         </button>
       </header>
 
-      <nav className="nav-tabs" role="tablist" aria-label="Sections">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            id={`tab-${t.key}`}
-            role="tab"
-            aria-selected={page === t.key}
-            aria-controls={`page-${t.key}`}
-            className="nav-btn"
-            onClick={() => setPage(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <TabBar tabs={tabs} current={view} onChange={setPage} />
 
       {/* All pages stay mounted (just hidden) so typed input and the history
           filter survive tab switches. */}
-      <main>
+      <main className={split ? 'split' : undefined}>
         <CourtPage
-          active={page === 'main'}
+          active={view === 'main'}
+          wide={wide}
           state={state}
           onNewDay={handleNewDay}
           onWin={handleWin}
           onRemove={handleRemoveTeam}
           onRegister={handleRegister}
+          onOpenAdd={() => addSheetRef.current?.open()}
           undoable={undoable}
           onUndo={handleUndo}
         />
         <TodayPage
-          active={page === 'today'}
+          active={view === 'today' || split}
+          asSidePanel={wide}
           state={state}
           today={today}
           undoableId={undoable?.id}
@@ -281,7 +262,7 @@ export default function App() {
           onDeleteMatch={handleDeleteMatch}
         />
         <HistoryPage
-          active={page === 'history'}
+          active={view === 'history'}
           state={state}
           today={today}
           undoableId={undoable?.id}
@@ -290,8 +271,22 @@ export default function App() {
           onDeleteMatch={handleDeleteMatch}
           onExport={handleExport}
         />
-        <AllTimePage active={page === 'alltime'} state={state} onRemove={handleRemoveAllTimeTeam} />
+        <AllTimePage active={view === 'alltime'} state={state} onRemove={handleRemoveAllTimeTeam} />
       </main>
+
+      {!wide && view === 'main' && (
+        <button className="fab" onClick={() => addSheetRef.current?.open()} aria-label="Add a team" aria-haspopup="dialog">
+          <PlusIcon />
+        </button>
+      )}
+      {!wide && (
+        <AddTeamSheet
+          ref={addSheetRef}
+          onRegister={handleRegister}
+          queueLength={state.queue.length}
+          onCourt={state.activeMatch.length}
+        />
+      )}
     </div>
   );
 }

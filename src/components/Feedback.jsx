@@ -68,7 +68,7 @@ export function FeedbackProvider({ children }) {
       <dialog
         ref={dialogRef}
         className="modal"
-        aria-labelledby="modal-title"
+        aria-labelledby={dialog ? 'modal-title' : undefined}
         aria-describedby={dialog?.message ? 'modal-message' : undefined}
         onCancel={(e) => {
           e.preventDefault();

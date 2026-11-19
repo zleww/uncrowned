@@ -1,12 +1,21 @@
 import MatchItem from './MatchItem.jsx';
 
-export default function TodayPage({ active, state, today, undoableId, onUndo, onDeleteMatch }) {
+// On wide screens this page is shown beside the court instead of as a tab,
+// so it becomes a labelled region rather than a tab panel.
+export default function TodayPage({ active, asSidePanel, state, today, undoableId, onUndo, onDeleteMatch }) {
   const { todayStats, allMatchLogs } = state;
   const todayLogs = allMatchLogs.filter((log) => log.date === today);
   const teams = Object.keys(todayStats).sort((a, b) => todayStats[b].wins - todayStats[a].wins);
 
   return (
-    <section id="page-today" className="page" role="tabpanel" aria-labelledby="tab-today" hidden={!active}>
+    <section
+      id="page-today"
+      className="page"
+      role={asSidePanel ? 'region' : 'tabpanel'}
+      aria-labelledby={asSidePanel ? undefined : 'tab-today'}
+      aria-label={asSidePanel ? 'Today' : undefined}
+      hidden={!active}
+    >
       <div className="card">
         <div className="card-title">
           <h2>Today's Leaderboard</h2>
