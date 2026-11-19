@@ -11,7 +11,7 @@
 //   queue:        [name, ...]    (first in line at index 0)
 //   allMatchLogs: [{ id, winner, loser, date, time, note }]  (newest first)
 
-import { toDateKey } from '../utils/dates.js';
+import { toDateKey, formatTime } from '../utils/dates.js';
 
 export const STREAK_LIMIT = 3;
 
@@ -37,20 +37,45 @@ function ensureTeam(state, name) {
   };
 }
 
+export const MAX_NAME_LENGTH = 30;
+
+// Cleans up a typed team name: unifies look-alike characters (NFKC), turns
+// any run of whitespace into one space, drops invisible control and
+// formatting characters (e.g. the right-to-left override, which can fake
+// text in the group-chat summary) and trims the ends.
+export function normalizeName(raw) {
+  return raw
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .replace(/[\p{Cc}\p{Cf}]/gu, '')
+    .trim();
+}
+
+// Names are compared without case: "Thunder" and "thunder" are one team.
+const nameKey = (name) => name.toLowerCase();
+
 // Rule 1: the first two teams go on court, the rest join the queue in order.
-// Returns { state, status } where status is 'ok', 'empty' or 'duplicate'.
+// Returns { state, status, name } where status is 'ok', 'empty', 'too_long'
+// or 'duplicate', and name is the name the team was registered under.
 export function registerTeam(state, rawName) {
-  const name = rawName.trim();
-  if (!name) return { state, status: 'empty' };
-  if (state.activeMatch.includes(name) || state.queue.includes(name)) {
+  const cleaned = normalizeName(rawName);
+  if (!cleaned) return { state, status: 'empty' };
+  if ([...cleaned].length > MAX_NAME_LENGTH) return { state, status: 'too_long' };
+
+  const key = nameKey(cleaned);
+  if ([...state.activeMatch, ...state.queue].some((t) => nameKey(t) === key)) {
     return { state, status: 'duplicate' };
   }
 
+  // A returning team keeps the spelling it was first registered with, so
+  // its all-time record stays in one place.
+  const name = Object.keys(state.allTimeTeams).find((t) => nameKey(t) === key) ?? cleaned;
+
   const next = ensureTeam(state, name);
   if (next.activeMatch.length < 2) {
-    return { state: { ...next, activeMatch: [...next.activeMatch, name] }, status: 'ok' };
+    return { state: { ...next, activeMatch: [...next.activeMatch, name] }, status: 'ok', name };
   }
-  return { state: { ...next, queue: [...next.queue, name] }, status: 'ok' };
+  return { state: { ...next, queue: [...next.queue, name] }, status: 'ok', name };
 }
 
 // Rules 2-5. `winnerIndex` is the winner's court slot (0 or 1).
@@ -105,7 +130,7 @@ export function recordResult(state, winnerIndex, now = new Date()) {
     winner,
     loser,
     date: toDateKey(now),
-    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    time: formatTime(now),
     note,
   };
 

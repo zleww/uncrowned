@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   STREAK_LIMIT,
+  MAX_NAME_LENGTH,
+  normalizeName,
   createInitialState,
   registerTeam,
   recordResult,
@@ -71,6 +73,47 @@ describe('registerTeam (rule 1)', () => {
   it('does not change the state it was given', () => {
     const start = deepFreeze(withTeams('A', 'B'));
     expect(() => registerTeam(start, 'C')).not.toThrow();
+  });
+
+  it('collapses repeated spaces inside the name', () => {
+    expect(registerTeam(createInitialState(), 'Big   Ballers').name).toBe('Big Ballers');
+  });
+
+  it('treats names that differ only in case or spacing as the same team', () => {
+    const start = withTeams('Thunder', 'Hawks');
+    expect(registerTeam(start, 'thunder').status).toBe('duplicate');
+    expect(registerTeam(start, ' THUNDER ').status).toBe('duplicate');
+  });
+
+  it('reuses the original spelling when a returning team types it differently', () => {
+    let s = withTeams('Thunder', 'Hawks');
+    s = startNewDay(s);
+    const result = registerTeam(s, 'thunder');
+    expect(result.name).toBe('Thunder');
+    expect(result.state.activeMatch).toEqual(['Thunder']);
+    expect(Object.keys(result.state.allTimeTeams)).toEqual(['Thunder', 'Hawks']);
+  });
+
+  it(`rejects names longer than ${MAX_NAME_LENGTH} characters`, () => {
+    const start = createInitialState();
+    expect(registerTeam(start, 'x'.repeat(MAX_NAME_LENGTH)).status).toBe('ok');
+    expect(registerTeam(start, 'x'.repeat(MAX_NAME_LENGTH + 1)).status).toBe('too_long');
+  });
+
+  it('counts an emoji as one character', () => {
+    expect(registerTeam(createInitialState(), '🏀'.repeat(MAX_NAME_LENGTH)).status).toBe('ok');
+  });
+
+  it('removes invisible control and direction characters', () => {
+    expect(normalizeName('Hawks‮skwah')).toBe('Hawksskwah');
+    expect(normalizeName('Thun​der')).toBe('Thunder');
+    expect(normalizeName('Line\nbreak')).toBe('Line break');
+    expect(registerTeam(createInitialState(), '​‮').status).toBe('empty');
+  });
+
+  it('keeps quotes and HTML-like text as plain characters', () => {
+    expect(registerTeam(createInitialState(), "O'Neal").name).toBe("O'Neal");
+    expect(registerTeam(createInitialState(), '<b>Hi</b>').name).toBe('<b>Hi</b>');
   });
 });
 
@@ -150,7 +193,17 @@ describe('recordResult', () => {
     expect(() => recordResult(start, 0, NOW)).not.toThrow();
   });
 
-  it.todo('files a game played at 6:00 AM Manila time under that Manila day (milestone 3)');
+  it('files a game played at 6:00 AM Manila time under that Manila day', () => {
+    const sixAm = new Date('2026-11-19T06:00:00+08:00'); // 22:00 UTC on Nov 18
+    const s = recordResult(withTeams('A', 'B'), 0, sixAm);
+    expect(s.allMatchLogs[0].date).toBe('2026-11-19');
+    expect(s.allMatchLogs[0].time).toBe('06:00 AM');
+  });
+
+  it('files a game at 11:59 PM Manila time under that day, not the next', () => {
+    const late = new Date('2026-11-19T23:59:00+08:00');
+    expect(recordResult(withTeams('A', 'B'), 0, late).allMatchLogs[0].date).toBe('2026-11-19');
+  });
 });
 
 describe('removeTeam (rule 6)', () => {

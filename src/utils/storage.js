@@ -1,7 +1,8 @@
-// localStorage persistence. Uses the same keys as the original single-file app,
-// so existing data on a phone carries over after the migration.
-// KNOWN ISSUE (fixed in milestone 3): JSON.parse is unguarded, so corrupt data
-// stops the app from loading.
+// localStorage persistence. Same keys as the original app, so existing data
+// carries over. Reading never crashes the app: unreadable or wrong-shaped
+// data is copied to a "<key>_corrupt_backup" entry and replaced by a default.
+
+import { toDateKey } from './dates.js';
 
 const KEYS = {
   allTimeTeams: 'court_alltime_teams',
@@ -10,29 +11,71 @@ const KEYS = {
   queue: 'court_queue',
   allMatchLogs: 'court_all_logs',
 };
-
 const THEME_KEY = 'court_theme';
+
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+function getItem(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null; // storage blocked (e.g. some private modes)
+  }
+}
+
+function setItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // storage full or blocked: keep running with in-memory state
+  }
+}
+
+function readJSON(key, isValid, fallback) {
+  const raw = getItem(key);
+  if (raw === null) return fallback;
+  try {
+    const value = JSON.parse(raw);
+    if (isValid(value)) return value;
+  } catch {
+    // fall through
+  }
+  setItem(`${key}_corrupt_backup`, raw);
+  return fallback;
+}
+
+// Match ids are the timestamp they were recorded at, so the correct Manila
+// day can be recomputed. This repairs games the old UTC bug filed under
+// "yesterday".
+function fixLogDates(logs) {
+  return logs
+    .filter(isPlainObject)
+    .map((log) => (Number.isFinite(log.id) && log.id > 1e12 ? { ...log, date: toDateKey(new Date(log.id)) } : log));
+}
+
+const onlyStrings = (arr) => arr.filter((t) => typeof t === 'string');
 
 export function loadState() {
   return {
-    allTimeTeams: JSON.parse(localStorage.getItem(KEYS.allTimeTeams) || '{}'),
-    todayStats: JSON.parse(localStorage.getItem(KEYS.todayStats) || '{}'),
-    activeMatch: JSON.parse(localStorage.getItem(KEYS.activeMatch) || '[]'),
-    queue: JSON.parse(localStorage.getItem(KEYS.queue) || '[]'),
-    allMatchLogs: JSON.parse(localStorage.getItem(KEYS.allMatchLogs) || '[]'),
+    allTimeTeams: readJSON(KEYS.allTimeTeams, isPlainObject, {}),
+    todayStats: readJSON(KEYS.todayStats, isPlainObject, {}),
+    activeMatch: onlyStrings(readJSON(KEYS.activeMatch, Array.isArray, [])).slice(0, 2),
+    queue: onlyStrings(readJSON(KEYS.queue, Array.isArray, [])),
+    allMatchLogs: fixLogDates(readJSON(KEYS.allMatchLogs, Array.isArray, [])),
   };
 }
 
 export function saveState(state) {
   for (const [field, key] of Object.entries(KEYS)) {
-    localStorage.setItem(key, JSON.stringify(state[field]));
+    setItem(key, JSON.stringify(state[field]));
   }
 }
 
 export function loadTheme() {
-  return localStorage.getItem(THEME_KEY) || 'dark';
+  const saved = getItem(THEME_KEY);
+  return saved === 'light' || saved === 'dark' ? saved : 'dark';
 }
 
 export function saveTheme(theme) {
-  localStorage.setItem(THEME_KEY, theme);
+  setItem(THEME_KEY, theme);
 }
