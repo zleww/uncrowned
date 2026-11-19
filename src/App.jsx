@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as engine from './engine/queue.js';
 import { getTodayString } from './utils/dates.js';
 import { loadState, saveState, saveTheme } from './utils/storage.js';
+import { downloadFile, matchesToCSV, stateToJSON } from './utils/export.js';
 import { useFeedback } from './components/Feedback.jsx';
 import CourtPage from './components/CourtPage.jsx';
 import TodayPage from './components/TodayPage.jsx';
@@ -66,8 +67,14 @@ export default function App() {
   const [theme, setTheme] = useState(() => document.documentElement.getAttribute('data-theme'));
   const today = useToday();
   const { confirm, notify, showText } = useFeedback();
+  // The latest state, for callbacks that outlive a render (the toast's Undo
+  // button is created with the state of the moment the game was recorded).
+  const stateRef = useRef(state);
 
-  useEffect(() => saveState(state), [state]);
+  useEffect(() => {
+    stateRef.current = state;
+    saveState(state);
+  }, [state]);
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -95,11 +102,28 @@ export default function App() {
     const next = engine.recordResult(state, idx);
     setState(next);
     const streak = next.todayStats[winner].streak;
+    const matchId = next.allMatchLogs[0].id;
     notify(
       streak === 0
         ? `${winner} beat ${loser}: ${engine.STREAK_LIMIT} straight, ${winner} rests`
         : `${winner} beat ${loser}: ${ordinal(streak)} win in a row`,
+      { key: 'result', action: { label: 'Undo', onClick: () => handleUndo(matchId) } },
     );
+  }
+
+  // Undo is only for the newest game, and only while it is still the newest:
+  // `matchId` stops a stale button from undoing a later game.
+  function handleUndo(matchId) {
+    const current = stateRef.current;
+    const match = engine.getUndoableMatch(current);
+    const next = engine.undoLastResult(current, matchId);
+    if (next === current) {
+      notify("That game can't be undone anymore.", { key: 'result' });
+      return;
+    }
+    stateRef.current = next; // a quick second tap sees the undone state
+    setState(next);
+    notify(`Undone: ${match.winner} def. ${match.loser}`, { key: 'result' });
   }
 
   async function handleRemoveTeam(name) {
@@ -131,7 +155,7 @@ export default function App() {
     if (!match) return;
     const ok = await confirm({
       title: 'Delete this match?',
-      message: `${match.winner} def. ${match.loser}. Their win and loss are taken back off the stats.`,
+      message: `${match.winner} def. ${match.loser}. The win and loss come off the records. Streaks and the queue stay as they are.`,
       confirmLabel: 'Delete match',
       danger: true,
     });
@@ -164,6 +188,17 @@ export default function App() {
     notify('New day started');
   }
 
+  function handleExport(format) {
+    const day = getTodayString();
+    if (format === 'csv') {
+      downloadFile(`uncrowned-matches-${day}.csv`, matchesToCSV(state.allMatchLogs), 'text/csv;charset=utf-8');
+      notify('Match history saved as CSV');
+    } else {
+      downloadFile(`uncrowned-backup-${day}.json`, stateToJSON(state), 'application/json');
+      notify('Backup saved as JSON');
+    }
+  }
+
   async function handleShare() {
     const summary = engine.buildSummary(state);
     if (!summary) {
@@ -185,6 +220,8 @@ export default function App() {
       showText({ title: 'Copy summary', message: 'Copy this and paste it in the GC.', text: summary.text });
     }
   }
+
+  const undoable = engine.getUndoableMatch(state);
 
   return (
     <div className="container">
@@ -232,14 +269,26 @@ export default function App() {
           onWin={handleWin}
           onRemove={handleRemoveTeam}
           onRegister={handleRegister}
+          undoable={undoable}
+          onUndo={handleUndo}
         />
-        <TodayPage active={page === 'today'} state={state} today={today} onDeleteMatch={handleDeleteMatch} />
+        <TodayPage
+          active={page === 'today'}
+          state={state}
+          today={today}
+          undoableId={undoable?.id}
+          onUndo={handleUndo}
+          onDeleteMatch={handleDeleteMatch}
+        />
         <HistoryPage
           active={page === 'history'}
           state={state}
           today={today}
+          undoableId={undoable?.id}
+          onUndo={handleUndo}
           onClearHistory={handleClearHistory}
           onDeleteMatch={handleDeleteMatch}
+          onExport={handleExport}
         />
         <AllTimePage active={page === 'alltime'} state={state} onRemove={handleRemoveAllTimeTeam} />
       </main>

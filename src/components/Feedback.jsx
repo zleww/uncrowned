@@ -3,16 +3,21 @@
 //   const { confirm, notify, showText } = useFeedback();
 //   if (await confirm({ title, message, confirmLabel, danger: true })) { ... }
 //   notify('Thunder beat Hawks');
+//   notify('Thunder beat Hawks', { action: { label: 'Undo', onClick }, key: 'result' });
 //   showText({ title, message, text });  // read-only text the user can copy
 //
 // The dialog uses the native <dialog> element: showModal() traps focus,
 // Esc closes it, and focus goes back to the button that opened it.
 // Toasts live in an aria-live region so screen readers announce them.
+// A toast with an action stays longer (8s). A toast with a `key` replaces
+// any earlier toast with the same key, so an old Undo button doesn't linger
+// next to a newer one.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const FeedbackContext = createContext(null);
 const TOAST_MS = 4000;
+const ACTION_TOAST_MS = 8000;
 
 export function useFeedback() {
   return useContext(FeedbackContext);
@@ -43,11 +48,16 @@ export function FeedbackProvider({ children }) {
     [],
   );
 
-  const notify = useCallback((message) => {
-    const id = `${Date.now()}-${Math.random()}`;
-    setToasts((list) => [...list.slice(-2), { id, message }]);
-    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), TOAST_MS);
-  }, []);
+  const dismiss = useCallback((id) => setToasts((list) => list.filter((t) => t.id !== id)), []);
+
+  const notify = useCallback(
+    (message, { action, key } = {}) => {
+      const id = `${Date.now()}-${Math.random()}`;
+      setToasts((list) => [...list.filter((t) => !key || t.key !== key).slice(-2), { id, key, message, action }]);
+      setTimeout(() => dismiss(id), action ? ACTION_TOAST_MS : TOAST_MS);
+    },
+    [dismiss],
+  );
 
   const value = useMemo(() => ({ confirm, showText, notify }), [confirm, showText, notify]);
 
@@ -108,7 +118,19 @@ export function FeedbackProvider({ children }) {
       <div className="toast-region" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className="toast">
-            {t.message}
+            <span>{t.message}</span>
+            {t.action && (
+              <button
+                type="button"
+                className="toast-action"
+                onClick={() => {
+                  dismiss(t.id);
+                  t.action.onClick();
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>

@@ -1,6 +1,6 @@
 import MatchItem from './MatchItem.jsx';
 
-export default function TodayPage({ active, state, today, onDeleteMatch }) {
+export default function TodayPage({ active, state, today, undoableId, onUndo, onDeleteMatch }) {
   const { todayStats, allMatchLogs } = state;
   const todayLogs = allMatchLogs.filter((log) => log.date === today);
   const teams = Object.keys(todayStats).sort((a, b) => todayStats[b].wins - todayStats[a].wins);
@@ -59,7 +59,13 @@ export default function TodayPage({ active, state, today, onDeleteMatch }) {
         ) : (
           <ul className="match-list scroll-box">
             {todayLogs.map((m) => (
-              <MatchItem key={m.id} match={m} onDelete={onDeleteMatch} />
+              <MatchItem
+                key={m.id}
+                match={m}
+                undoable={m.id === undoableId}
+                onUndo={onUndo}
+                onDelete={onDeleteMatch}
+              />
             ))}
           </ul>
         )}

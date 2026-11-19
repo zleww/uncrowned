@@ -42,7 +42,7 @@ function TeamCard({ team, streak, onWin, onRemove }) {
   );
 }
 
-export default function CourtPage({ active, state, onNewDay, onWin, onRemove, onRegister }) {
+export default function CourtPage({ active, state, onNewDay, onWin, onRemove, onRegister, undoable, onUndo }) {
   const [teamName, setTeamName] = useState('');
   const [error, setError] = useState('');
   const { activeMatch, queue, todayStats } = state;
@@ -101,6 +101,16 @@ export default function CourtPage({ active, state, onNewDay, onWin, onRemove, on
         <div id="matchArea" className="court">
           {court}
         </div>
+        {undoable && (
+          <div className="last-game">
+            <span className="muted">
+              Last game: <b>{undoable.winner}</b> def. <b>{undoable.loser}</b>
+            </span>
+            <button className="btn-text" onClick={() => onUndo(undoable.id)}>
+              Undo
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card">

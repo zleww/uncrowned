@@ -9,11 +9,15 @@
 //   todayStats:   { [name]: { wins, losses, streak } }
 //   activeMatch:  [name, name]   (0-2 teams on court)
 //   queue:        [name, ...]    (first in line at index 0)
-//   allMatchLogs: [{ id, winner, loser, date, time, note }]  (newest first)
+//   allMatchLogs: [{ id, winner, loser, date, time, note, prev? }]  (newest first)
+//
+// `prev` is the undo snapshot: the court, queue and the two teams' streaks
+// from just before that result. Only the newest UNDO_LIMIT matches keep one.
 
 import { toDateKey, formatTime } from '../utils/dates.js';
 
 export const STREAK_LIMIT = 3;
+export const UNDO_LIMIT = 10;
 
 // Object.hasOwn instead of `obj[name]` so a team called "__proto__" or
 // "constructor" is treated as a normal name instead of reading (and then
@@ -132,9 +136,87 @@ export function recordResult(state, winnerIndex, now = new Date()) {
     date: toDateKey(now),
     time: formatTime(now),
     note,
+    prev: {
+      activeMatch: s.activeMatch,
+      queue: s.queue,
+      streaks: { [winner]: w.streak, [loser]: l.streak },
+    },
   };
 
-  return { ...s, todayStats, allTimeTeams, activeMatch, queue, allMatchLogs: [log, ...s.allMatchLogs] };
+  // Older matches lose their snapshot so storage doesn't grow with every game.
+  const older = s.allMatchLogs.map((m, i) => (i >= UNDO_LIMIT - 1 && m.prev ? withoutPrev(m) : m));
+
+  return { ...s, todayStats, allTimeTeams, activeMatch, queue, allMatchLogs: [log, ...older] };
+}
+
+const withoutPrev = ({ prev: _prev, ...log }) => log;
+
+// Removes every undo snapshot. Used by actions that change the court, the
+// queue or the stats in a way a snapshot can't account for (removing a
+// team, deleting a match, a new day): undoing past them would bring back
+// a team that was removed or yesterday's court.
+function cutUndo(logs) {
+  return logs.some((m) => m.prev) ? logs.map((m) => (m.prev ? withoutPrev(m) : m)) : logs;
+}
+
+const isStringArray = (v) => Array.isArray(v) && v.every((t) => typeof t === 'string');
+
+// The snapshot comes back from localStorage, so check its shape before use.
+function isValidSnapshot(prev, match) {
+  return (
+    prev !== null &&
+    typeof prev === 'object' &&
+    isStringArray(prev.activeMatch) &&
+    prev.activeMatch.length === 2 &&
+    isStringArray(prev.queue) &&
+    prev.streaks !== null &&
+    typeof prev.streaks === 'object' &&
+    Number.isInteger(prev.streaks[match.winner]) &&
+    Number.isInteger(prev.streaks[match.loser])
+  );
+}
+
+// The newest match, if it can be undone; otherwise null.
+export function getUndoableMatch(state) {
+  const match = state.allMatchLogs[0];
+  return match && isValidSnapshot(match.prev, match) ? match : null;
+}
+
+// Undoes the newest match: puts back the court, the queue and both teams'
+// streaks from the snapshot, takes the win and loss back off today's and
+// all-time stats, and deletes the match. Teams that joined the queue after
+// that game stay at the back of the line.
+// Pass `matchId` to undo only if that match is still the newest one (so an
+// old "Undo" button can't undo a later game). Returns the same state object
+// when there is nothing to undo.
+export function undoLastResult(state, matchId) {
+  const match = getUndoableMatch(state);
+  if (!match || (matchId !== undefined && match.id !== matchId)) return state;
+  const { prev } = match;
+
+  const before = new Set([...prev.activeMatch, ...prev.queue]);
+  const newcomers = [...state.activeMatch, ...state.queue].filter((t) => !before.has(t));
+
+  const undoStat = (stats, name, field, streak) => {
+    if (!has(stats, name)) return stats;
+    const updated = { ...stats[name], [field]: Math.max(0, stats[name][field] - 1) };
+    if (streak !== undefined) updated.streak = streak;
+    return { ...stats, [name]: updated };
+  };
+
+  let todayStats = undoStat(state.todayStats, match.winner, 'wins', prev.streaks[match.winner]);
+  todayStats = undoStat(todayStats, match.loser, 'losses', prev.streaks[match.loser]);
+  let allTimeTeams = undoStat(state.allTimeTeams, match.winner, 'wins');
+  allTimeTeams = undoStat(allTimeTeams, match.loser, 'losses');
+
+  return {
+    ...state,
+    todayStats,
+    allTimeTeams,
+    activeMatch: prev.activeMatch,
+    queue: [...prev.queue, ...newcomers],
+    allMatchLogs: state.allMatchLogs.slice(1),
+  };
 }
 
 // Rule 6: takes a team off the court/queue and clears its stats for today.
@@ -151,7 +233,7 @@ export function removeTeam(state, name) {
       queue = queue.slice(1);
     }
   }
-  return { ...state, todayStats, queue, activeMatch };
+  return { ...state, todayStats, queue, activeMatch, allMatchLogs: cutUndo(state.allMatchLogs) };
 }
 
 // Same as removeTeam, and also deletes the team's all-time record.
@@ -160,10 +242,10 @@ export function removeTeamEverywhere(state, name) {
   return removeTeam({ ...state, allTimeTeams }, name);
 }
 
-// Deletes one match and takes its win/loss back off the stats (never below 0).
-// Today's stats only change when the match was played on `today`.
-// It does not restore streaks or the queue — snapshot-based undo replaces
-// this in milestone 4.
+// Correction for an older match: deletes it and takes its win/loss back off
+// the stats (never below 0). Today's stats only change when the match was
+// played on `today`. Streaks and the queue are left as they are, since later
+// games have happened since; use undoLastResult for the newest match.
 export function removeMatch(state, matchId, today) {
   const match = state.allMatchLogs.find((m) => m.id === matchId);
   if (!match) return state;
@@ -185,7 +267,7 @@ export function removeMatch(state, matchId, today) {
     ...state,
     todayStats,
     allTimeTeams,
-    allMatchLogs: state.allMatchLogs.filter((m) => m !== match),
+    allMatchLogs: cutUndo(state.allMatchLogs.filter((m) => m !== match)),
   };
 }
 
@@ -196,7 +278,7 @@ export function clearHistory(state) {
 // Rule 7: clears the court, the queue and today's stats.
 // Match history and all-time records stay.
 export function startNewDay(state) {
-  return { ...state, activeMatch: [], queue: [], todayStats: {} };
+  return { ...state, activeMatch: [], queue: [], todayStats: {}, allMatchLogs: cutUndo(state.allMatchLogs) };
 }
 
 // Plain-text summary for the group chat: { title, text }, or null when there
