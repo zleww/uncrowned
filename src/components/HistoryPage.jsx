@@ -27,7 +27,16 @@ function groupByDate(logs) {
   return [...grouped.entries()].sort(([a], [b]) => (a < b ? 1 : -1));
 }
 
-export default function HistoryPage({ active, state, today, onClearHistory, onDeleteMatch }) {
+export default function HistoryPage({
+  active,
+  state,
+  today,
+  undoableId,
+  onUndo,
+  onClearHistory,
+  onDeleteMatch,
+  onExport,
+}) {
   const [filter, setFilter] = useState('today');
   const filtered = filterLogs(state.allMatchLogs, filter, today);
   const current = FILTERS.find((f) => f.key === filter);
@@ -61,7 +70,13 @@ export default function HistoryPage({ active, state, today, onClearHistory, onDe
                 </div>
                 <ul className="match-list">
                   {matches.map((m) => (
-                    <MatchItem key={m.id} match={m} onDelete={onDeleteMatch} />
+                    <MatchItem
+                      key={m.id}
+                      match={m}
+                      undoable={m.id === undoableId}
+                      onUndo={onUndo}
+                      onDelete={onDeleteMatch}
+                    />
                   ))}
                 </ul>
               </Fragment>
@@ -71,6 +86,14 @@ export default function HistoryPage({ active, state, today, onClearHistory, onDe
 
         {state.allMatchLogs.length > 0 && (
           <div className="card-footer">
+            <div className="footer-group" role="group" aria-label="Export">
+              <button className="btn-text" onClick={() => onExport('csv')} title="All matches, for Excel or Google Sheets">
+                Export CSV
+              </button>
+              <button className="btn-text" onClick={() => onExport('json')} title="Full backup: teams, records and matches">
+                Export JSON
+              </button>
+            </div>
             <button className="btn-text danger" onClick={onClearHistory}>
               Clear all history
             </button>

@@ -16,6 +16,12 @@ A winner-stays queue manager for pickup basketball. Teams register, two play, th
 
 Every rule is covered by unit tests in `src/engine/queue.test.js`.
 
+## Undo and export
+
+- **Undo:** after each game a toast offers Undo for 8 seconds, and the court shows "Last game … Undo" until something else changes. Undo puts the court, queue, streaks and stats back exactly as they were. You can undo several games in a row (up to the last 10). Removing a team, deleting a match or starting a new day ends the undo chain.
+- **Delete** on an older match is a correction: it takes the win and loss off the records but leaves streaks and the queue alone.
+- **Export** (History tab): CSV of every match for Excel or Google Sheets, or a JSON backup of teams, records and matches. Names that look like spreadsheet formulas (`=`, `+`, `-`, `@`) are exported as plain text.
+
 ## Run it locally
 
 Needs [Node.js](https://nodejs.org/) 20 or newer.
@@ -41,13 +47,14 @@ src/
   components/           one component per page, MatchItem, Feedback (modal + toasts)
   utils/dates.js        Manila-time date helpers
   utils/storage.js      localStorage load/save that never crashes on bad data
+  utils/export.js       CSV/JSON export (formula-safe CSV)
   styles/tokens.css     colors, type, spacing (dark + light themes)
   styles/base.css       page background glow, grain texture, resets
   styles/components.css component styles
   styles/contrast.test.js  checks every text color meets WCAG contrast
 ```
 
-Data is currently stored in the browser's `localStorage`.
+Data is currently stored in the browser's `localStorage`, so export a backup now and then.
 
 ## Tech
 

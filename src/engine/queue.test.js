@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   STREAK_LIMIT,
   MAX_NAME_LENGTH,
+  UNDO_LIMIT,
   normalizeName,
   createInitialState,
   registerTeam,
@@ -12,6 +13,8 @@ import {
   clearHistory,
   startNewDay,
   buildSummary,
+  getUndoableMatch,
+  undoLastResult,
 } from './queue.js';
 
 // Noon UTC, so the date is the same in UTC and in Manila (UTC+8).
@@ -296,6 +299,117 @@ describe('removeMatch', () => {
   it('ignores an unknown id', () => {
     const start = recordResult(withTeams('A', 'B'), 0, NOW);
     expect(removeMatch(start, 123, TODAY)).toBe(start);
+  });
+});
+
+describe('undoLastResult', () => {
+  const at = (i) => new Date(NOW.getTime() + i * 60_000);
+
+  it('puts back the exact state from before a normal result', () => {
+    const before = deepFreeze(withTeams('A', 'B', 'C', 'D'));
+    const after = recordResult(before, 0, NOW);
+    expect(undoLastResult(after)).toEqual(before);
+  });
+
+  it('puts back the exact state from before a streak-cap result', () => {
+    let s = withTeams('A', 'B', 'C', 'D');
+    for (let i = 0; i < STREAK_LIMIT - 1; i++) s = recordResult(s, 0, at(i));
+    const before = deepFreeze(s);
+    const after = recordResult(before, 0, at(9)); // A hits the cap and rests
+    expect(after.activeMatch).not.toContain('A');
+    expect(undoLastResult(after)).toEqual(before);
+    expect(undoLastResult(after).todayStats.A.streak).toBe(STREAK_LIMIT - 1);
+  });
+
+  it('puts back the exact state when the loser stayed on (empty queue)', () => {
+    const before = deepFreeze(withTeams('A', 'B'));
+    expect(undoLastResult(recordResult(before, 1, NOW))).toEqual(before);
+  });
+
+  it('undoes game after game, back to the start', () => {
+    let s = withTeams('Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo');
+    const history = [s];
+    [0, 0, 0, 1, 0, 1, 1, 0].forEach((slot, i) => {
+      s = recordResult(s, slot, at(i));
+      history.push(s);
+    });
+    while (history.length > 1) {
+      history.pop();
+      s = undoLastResult(s);
+      expect(s).toEqual(history.at(-1));
+    }
+    expect(undoLastResult(s)).toBe(s); // nothing left to undo
+  });
+
+  it('keeps teams that joined after the game at the back of the queue', () => {
+    let s = recordResult(withTeams('A', 'B', 'C'), 0, NOW); // court A,C; queue B
+    s = registerTeam(s, 'D').state;
+    s = undoLastResult(s);
+    expect(s.activeMatch).toEqual(['A', 'B']);
+    expect(s.queue).toEqual(['C', 'D']);
+    expect(s.todayStats.D).toEqual({ wins: 0, losses: 0, streak: 0 });
+  });
+
+  it('only undoes the match it was asked to, if it is still the newest', () => {
+    let s = recordResult(withTeams('A', 'B', 'C'), 0, at(0));
+    const firstId = s.allMatchLogs[0].id;
+    s = recordResult(s, 0, at(1));
+    expect(undoLastResult(s, firstId)).toBe(s);
+    expect(undoLastResult(s, s.allMatchLogs[0].id).allMatchLogs).toHaveLength(1);
+  });
+
+  it('does nothing when there are no matches', () => {
+    const s = withTeams('A', 'B');
+    expect(getUndoableMatch(s)).toBeNull();
+    expect(undoLastResult(s)).toBe(s);
+  });
+
+  it('cannot undo matches saved before undo existed (no snapshot)', () => {
+    const s = withTeams('A', 'B');
+    const old = { ...s, allMatchLogs: [{ id: 1, winner: 'A', loser: 'B', date: TODAY, time: '', note: '' }] };
+    expect(getUndoableMatch(old)).toBeNull();
+    expect(undoLastResult(old)).toBe(old);
+  });
+
+  it('ignores a damaged snapshot instead of restoring junk', () => {
+    const s = recordResult(withTeams('A', 'B', 'C'), 0, NOW);
+    const [log] = s.allMatchLogs;
+    for (const prev of [null, 'x', { ...log.prev, queue: [1] }, { ...log.prev, activeMatch: ['A'] }, { ...log.prev, streaks: {} }]) {
+      const damaged = { ...s, allMatchLogs: [{ ...log, prev }] };
+      expect(undoLastResult(damaged)).toBe(damaged);
+    }
+  });
+
+  it.each([
+    ['removing a team', (s) => removeTeam(s, 'C')],
+    ['deleting a match', (s) => removeMatch(s, s.allMatchLogs[1].id, TODAY)],
+    ['starting a new day', (s) => startNewDay(s)],
+  ])('is no longer possible after %s', (_label, action) => {
+    let s = withTeams('A', 'B', 'C', 'D');
+    s = recordResult(s, 0, at(0));
+    s = recordResult(s, 0, at(1));
+    s = action(s);
+    expect(getUndoableMatch(s)).toBeNull();
+    expect(s.allMatchLogs.some((m) => 'prev' in m)).toBe(false);
+  });
+
+  it('is still possible after adding a team', () => {
+    const s = registerTeam(recordResult(withTeams('A', 'B'), 0, NOW), 'C').state;
+    expect(getUndoableMatch(s)).not.toBeNull();
+  });
+
+  it(`keeps snapshots only on the newest ${UNDO_LIMIT} matches`, () => {
+    let s = withTeams('A', 'B', 'C');
+    for (let i = 0; i < UNDO_LIMIT + 5; i++) s = recordResult(s, i % 2, at(i));
+    const withSnapshot = s.allMatchLogs.map((m) => 'prev' in m);
+    expect(withSnapshot.slice(0, UNDO_LIMIT).every(Boolean)).toBe(true);
+    expect(withSnapshot.slice(UNDO_LIMIT).some(Boolean)).toBe(false);
+  });
+
+  it('never takes stats below zero', () => {
+    let s = recordResult(withTeams('A', 'B'), 0, NOW);
+    s = { ...s, allTimeTeams: { ...s.allTimeTeams, A: { wins: 0, losses: 0 } } };
+    expect(undoLastResult(s).allTimeTeams.A.wins).toBe(0);
   });
 });
 
