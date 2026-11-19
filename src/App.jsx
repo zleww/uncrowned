@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import * as actions from './state/actions.js';
+import * as engine from './engine/queue.js';
+import { getTodayString } from './utils/dates.js';
 import { loadState, saveState, saveTheme } from './utils/storage.js';
 import CourtPage from './components/CourtPage.jsx';
 import TodayPage from './components/TodayPage.jsx';
@@ -42,7 +43,7 @@ export default function App() {
   }
 
   function handleRegister(name) {
-    const { state: next, status } = actions.registerTeam(state, name);
+    const { state: next, status } = engine.registerTeam(state, name);
     if (status === 'duplicate') {
       alert('This team is already on court or in the queue!');
       return false;
@@ -54,7 +55,7 @@ export default function App() {
 
   function handleRemoveTeam(name) {
     if (!confirm(`Remove "${name}" from today's session?`)) return;
-    commit(actions.deleteTeam(state, name));
+    commit(engine.removeTeam(state, name));
   }
 
   function handleRemoveAllTimeTeam(name) {
@@ -64,14 +65,14 @@ export default function App() {
       )
     )
       return;
-    commit(actions.deleteAllTimeTeam(state, name));
+    commit(engine.removeTeamEverywhere(state, name));
   }
 
   function handleDeleteMatch(id) {
     const match = state.allMatchLogs.find((m) => m.id === id);
     if (!match) return;
     if (!confirm(`Delete match record: "${match.winner} def. ${match.loser}"? This will reverse their stats.`)) return;
-    commit(actions.removeMatch(state, id));
+    commit(engine.removeMatch(state, id, getTodayString()));
   }
 
   function handleClearHistory() {
@@ -81,7 +82,7 @@ export default function App() {
       )
     )
       return;
-    commit(actions.clearAllHistory(state));
+    commit(engine.clearHistory(state));
   }
 
   function handleNewDay() {
@@ -91,11 +92,11 @@ export default function App() {
       )
     )
       return;
-    commit(actions.startNewDay(state));
+    commit(engine.startNewDay(state));
   }
 
   function handleShare() {
-    const summary = actions.buildTodaySummary(state);
+    const summary = engine.buildSummary(state);
     if (!summary) {
       alert('No matches or teams recorded today to share.');
       return;
@@ -137,7 +138,7 @@ export default function App() {
         state={state}
         onShare={handleShare}
         onNewDay={handleNewDay}
-        onWin={(idx) => commit(actions.recordResult(state, idx))}
+        onWin={(idx) => commit(engine.recordResult(state, idx))}
         onRemove={handleRemoveTeam}
         onRegister={handleRegister}
       />
