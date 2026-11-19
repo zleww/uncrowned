@@ -38,9 +38,13 @@ src/
   App.jsx               app state, tab navigation, action handlers
   engine/queue.js       court rules as pure functions (no DOM, no storage)
   engine/queue.test.js  unit tests for every rule
-  components/           one component per page, plus MatchItem
-  utils/                dates and localStorage helpers
-  styles/app.css        themes and styles
+  components/           one component per page, MatchItem, Feedback (modal + toasts)
+  utils/dates.js        Manila-time date helpers
+  utils/storage.js      localStorage load/save that never crashes on bad data
+  styles/tokens.css     colors, type, spacing (dark + light themes)
+  styles/base.css       page background glow, grain texture, resets
+  styles/components.css component styles
+  styles/contrast.test.js  checks every text color meets WCAG contrast
 ```
 
 Data is currently stored in the browser's `localStorage`.
