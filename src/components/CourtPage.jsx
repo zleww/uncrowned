@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { STREAK_LIMIT } from '../state/actions.js';
+import { STREAK_LIMIT } from '../engine/queue.js';
 
 const muted = { color: 'var(--text-muted)' };
 

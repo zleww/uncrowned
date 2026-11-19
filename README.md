@@ -10,8 +10,11 @@ A winner-stays queue manager for pickup basketball. Teams register, two play, th
 2. Declaring a winner gives the winner +1 streak and resets the loser's streak to 0.
 3. Normally the loser goes to the back of the queue and the next team in the queue takes their spot.
 4. When a team reaches a 3-win streak, its streak resets, the loser goes to the queue first, then the winner, and the next two queued teams take the court.
-5. Removing a team takes it off the court or out of the queue; an open court spot is filled from the queue.
-6. "Start New Day" clears the court, queue and today's stats. History and all-time records stay.
+5. If nobody is waiting in the queue, the loser stays on court and the same two teams play again.
+6. Removing a team takes it off the court or out of the queue; an open court spot is filled from the queue.
+7. "Start New Day" clears the court, queue and today's stats. History and all-time records stay.
+
+Every rule is covered by unit tests in `src/engine/queue.test.js`.
 
 ## Run it locally
 
@@ -22,6 +25,8 @@ npm install
 npm run dev      # starts the dev server at http://localhost:5173
 npm run build    # production build into dist/
 npm run preview  # serves the production build
+npm test         # runs the unit tests once
+npm run test:watch  # re-runs tests on every save
 ```
 
 ## Project structure
@@ -31,7 +36,8 @@ index.html              page shell
 src/
   main.jsx              entry point (applies saved theme, mounts React)
   App.jsx               app state, tab navigation, action handlers
-  state/actions.js      court rules (register, record result, remove, new day, summary)
+  engine/queue.js       court rules as pure functions (no DOM, no storage)
+  engine/queue.test.js  unit tests for every rule
   components/           one component per page, plus MatchItem
   utils/                dates and localStorage helpers
   styles/app.css        themes and styles
@@ -41,4 +47,4 @@ Data is currently stored in the browser's `localStorage`.
 
 ## Tech
 
-React 19, Vite.
+React 19, Vite, Vitest.
