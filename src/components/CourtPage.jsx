@@ -1,10 +1,6 @@
-import { useState } from 'react';
-import { MAX_NAME_LENGTH, STREAK_LIMIT } from '../engine/queue.js';
-
-const REGISTER_ERRORS = {
-  duplicate: 'That team is already on court or in the queue.',
-  too_long: `Team names can be up to ${MAX_NAME_LENGTH} characters.`,
-};
+import { STREAK_LIMIT } from '../engine/queue.js';
+import AddTeamForm from './AddTeamForm.jsx';
+import QueueItem from './QueueItem.jsx';
 
 function StreakDots({ streak }) {
   return (
@@ -42,51 +38,55 @@ function TeamCard({ team, streak, onWin, onRemove }) {
   );
 }
 
-export default function CourtPage({ active, state, onNewDay, onWin, onRemove, onRegister, undoable, onUndo }) {
-  const [teamName, setTeamName] = useState('');
-  const [error, setError] = useState('');
+// What a screen reader hears when the court changes.
+function courtAnnouncement(activeMatch, queue) {
+  if (activeMatch.length < 2) return activeMatch.length ? `On court: ${activeMatch[0]}, waiting for a challenger.` : '';
+  const next = queue.length ? ` Next up: ${queue[0]}.` : '';
+  return `On court: ${activeMatch[0]} versus ${activeMatch[1]}.${next}`;
+}
+
+export default function CourtPage({
+  active,
+  wide,
+  state,
+  onNewDay,
+  onWin,
+  onRemove,
+  onRegister,
+  onOpenAdd,
+  undoable,
+  onUndo,
+}) {
   const { activeMatch, queue, todayStats } = state;
   const streakOf = (team) => todayStats[team]?.streak || 0;
 
-  function submit(e) {
-    e.preventDefault();
-    const status = onRegister(teamName);
-    setError(REGISTER_ERRORS[status] ?? '');
-    if (status === 'ok') setTeamName('');
-  }
-
+  // Cards are keyed by team name, so a team that just walked on court gets a
+  // fresh card (and its entrance animation) while the winner's card stays.
   let court;
   if (activeMatch.length === 0) {
-    court = <p className="empty court-empty">Add 2 teams below to start the game.</p>;
-  } else if (activeMatch.length === 1) {
-    const team = activeMatch[0];
     court = (
-      <>
-        <TeamCard team={team} streak={streakOf(team)} onRemove={() => onRemove(team)} />
-        <div className="vs" aria-hidden="true">
-          VS
-        </div>
-        <div className="team-card waiting">Waiting for a challenger…</div>
-      </>
+      <div className="court-empty">
+        <p className="empty">{wide ? 'Add 2 teams below to start the game.' : 'Add 2 teams to start the game.'}</p>
+        {!wide && (
+          <button className="btn btn-primary" onClick={onOpenAdd}>
+            Add teams
+          </button>
+        )}
+      </div>
     );
   } else {
     court = (
       <>
-        <TeamCard
-          team={activeMatch[0]}
-          streak={streakOf(activeMatch[0])}
-          onWin={() => onWin(0)}
-          onRemove={() => onRemove(activeMatch[0])}
-        />
-        <div className="vs" aria-hidden="true">
-          VS
-        </div>
-        <TeamCard
-          team={activeMatch[1]}
-          streak={streakOf(activeMatch[1])}
-          onWin={() => onWin(1)}
-          onRemove={() => onRemove(activeMatch[1])}
-        />
+        {activeMatch.map((team, slot) => (
+          <TeamCard
+            key={team}
+            team={team}
+            streak={streakOf(team)}
+            onWin={activeMatch.length === 2 ? () => onWin(slot) : undefined}
+            onRemove={() => onRemove(team)}
+          />
+        ))}
+        {activeMatch.length === 1 && <div className="team-card waiting">Waiting for a challenger…</div>}
       </>
     );
   }
@@ -98,8 +98,13 @@ export default function CourtPage({ active, state, onNewDay, onWin, onRemove, on
           <h2>On Court</h2>
           <span className="badge">{STREAK_LIMIT}-win cap</span>
         </div>
-        <div id="matchArea" className="court">
+        <div id="matchArea" className={activeMatch.length ? 'court' : 'court is-empty'}>
           {court}
+          {activeMatch.length > 0 && (
+            <div className="vs" aria-hidden="true">
+              VS
+            </div>
+          )}
         </div>
         {undoable && (
           <div className="last-game">
@@ -111,6 +116,9 @@ export default function CourtPage({ active, state, onNewDay, onWin, onRemove, on
             </button>
           </div>
         )}
+        <p className="visually-hidden" aria-live="polite">
+          {active ? courtAnnouncement(activeMatch, queue) : ''}
+        </p>
       </div>
 
       <div className="card">
@@ -121,53 +129,27 @@ export default function CourtPage({ active, state, onNewDay, onWin, onRemove, on
         {queue.length === 0 ? (
           <p className="empty">No teams waiting.</p>
         ) : (
-          <ol id="queueList" className="queue">
-            {queue.map((team, idx) => (
-              <li className="queue-item" key={team}>
-                <span className="queue-pos">{idx + 1}</span>
-                <span className="queue-name">{team}</span>
-                {idx === 0 && <span className="badge">Next up</span>}
-                <button className="icon-btn" aria-label={`Remove ${team} from the queue`} onClick={() => onRemove(team)}>
-                  ×
-                </button>
-              </li>
-            ))}
-          </ol>
+          <>
+            <ol id="queueList" className="queue">
+              {queue.map((team, idx) => (
+                <QueueItem key={team} team={team} position={idx + 1} onRemove={onRemove} />
+              ))}
+            </ol>
+            <p className="swipe-hint">Swipe a team left to remove it.</p>
+          </>
         )}
       </div>
 
-      <form className="card" onSubmit={submit} noValidate>
-        <div className="card-title">
-          <h2>
-            <label htmlFor="teamInput">Add a team</label>
-          </h2>
+      {wide && (
+        <div className="card">
+          <div className="card-title">
+            <h2>
+              <label htmlFor="teamInput">Add a team</label>
+            </h2>
+          </div>
+          <AddTeamForm onRegister={onRegister} />
         </div>
-        <div className="input-row">
-          <input
-            id="teamInput"
-            className="input"
-            type="text"
-            placeholder="Team name, e.g. Thunder"
-            autoComplete="off"
-            maxLength={MAX_NAME_LENGTH * 2}
-            value={teamName}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? 'teamInputError' : undefined}
-            onChange={(e) => {
-              setTeamName(e.target.value);
-              if (error) setError('');
-            }}
-          />
-          <button className="btn btn-primary" type="submit">
-            Add
-          </button>
-        </div>
-        {error && (
-          <p id="teamInputError" className="field-error" role="alert">
-            {error}
-          </p>
-        )}
-      </form>
+      )}
 
       <div className="card session-card">
         <p className="muted">Done for today?</p>
